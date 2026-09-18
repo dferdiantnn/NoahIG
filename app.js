@@ -115,6 +115,53 @@ const SATSET_SCRIPT = `
   await fetchRest('following', following, 'Following');
   await fetchRest('followers', followers, 'Followers');
 
+  // Deteksi akun yang tidak follow back
+  const followersSet = new Set(followers.map(u => (u.username || '').toLowerCase()));
+  const unfollowers = following.filter(u => !followersSet.has((u.username || '').toLowerCase()));
+
+  // Cek followers asli (pengikut si akun) untuk akun yang tidak follow back
+  if (unfollowers.length > 0) {
+    statusEl.textContent = 'Menganalisis pengikut unfollower...';
+    let checked = 0;
+    
+    for (const u of unfollowers) {
+      checked++;
+      progressEl.innerHTML = \`🔍 Cek Pengikut (\${checked}/\${unfollowers.length}):<br><b style="color:#f472b6;">@\${u.username}</b>\`;
+
+      // Jika akun sudah centang biru (verified), sudah pasti official!
+      if (u.is_verified) {
+        if (!u.follower_count) u.follower_count = 1000000;
+        continue;
+      }
+
+      // Jika akun privat/gembok, pasti akun personal (<10k)
+      if (u.is_private) {
+        if (!u.follower_count) u.follower_count = 500;
+        continue;
+      }
+
+      // Ambil angka pengikut asli dari profile endpoint
+      try {
+        const uRes = await fetch(\`https://www.instagram.com/api/v1/users/web_profile_info/?username=\${encodeURIComponent(u.username)}\`, { headers, credentials: 'include' });
+        if (uRes.ok) {
+          const uJson = await uRes.json();
+          const userObj = uJson?.data?.user;
+          if (userObj) {
+            if (typeof userObj.edge_followed_by?.count === 'number') {
+              u.follower_count = userObj.edge_followed_by.count;
+            }
+            if (userObj.is_verified) u.is_verified = true;
+            if (userObj.profile_pic_url) u.profile_pic_url = userObj.profile_pic_url;
+            if (userObj.full_name) u.full_name = userObj.full_name;
+          }
+        }
+        await new Promise(r => setTimeout(r, 200));
+      } catch (err) {
+        // Safe continue
+      }
+    }
+  }
+
   const payload = {
     source: 'NoahIG_SatSet',
     timestamp: Date.now(),
@@ -124,8 +171,8 @@ const SATSET_SCRIPT = `
 
   const payloadStr = JSON.stringify(payload);
 
-  statusEl.textContent = '✅ Selesai Sat-Set!';
-  progressEl.innerHTML = \`Following: <b>\${following.length}</b> &bull; Followers: <b>\${followers.length}</b><br><span style="color:#10b981;">Data siap dimasukkan ke NoahIG!</span>\`;
+  statusEl.textContent = '✅ Selesai Sat-Set v2.0!';
+  progressEl.innerHTML = \`Following: <b>\${following.length}</b> &bull; Followers: <b>\${followers.length}</b><br>Tidak Follback: <b>\${unfollowers.length}</b> akun<br><span style="color:#10b981;">Data siap dimasukkan ke NoahIG!</span>\`;
   
   try {
     await navigator.clipboard.writeText(payloadStr);
@@ -531,6 +578,19 @@ function formatCompactNumber(num) {
   return num.toString();
 }
 
+function formatFollowerCount(count) {
+  if (typeof count !== 'number' || isNaN(count) || count <= 0) return '';
+  if (count >= 1000000) {
+    const val = (count / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 1 });
+    return `${val} jt pengikut`;
+  }
+  if (count >= 1000) {
+    const val = (count / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 });
+    return `${val} rb pengikut`;
+  }
+  return `${count} pengikut`;
+}
+
 /**
  * Execute Relationship Calculation
  */
@@ -706,7 +766,7 @@ function renderList() {
 
   filtered.forEach((user) => {
     const card = document.createElement('div');
-    card.className = 'glass-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 group relative overflow-hidden transition-all duration-200';
+    card.className = 'glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3.5 group relative overflow-hidden transition-all duration-200 border border-slate-800/80 hover:border-pink-500/40';
     
     const classification = getUserClassification(user);
     const isOfficial = classification === 'official';
@@ -719,7 +779,7 @@ function renderList() {
 
     let followersText = '';
     if (typeof user.follower_count === 'number' && user.follower_count > 0) {
-      followersText = `${formatCompactNumber(user.follower_count)} pengikut`;
+      followersText = formatFollowerCount(user.follower_count);
     }
 
     const avatarHtml = user.profile_pic_url
@@ -731,53 +791,63 @@ function renderList() {
       : '';
 
     const classBadgeHtml = isOfficial
-      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="badge-check" class="w-3 h-3 text-pink-400"></i> Official (&gt;${formatCompactNumber(state.officialThreshold)})</span>`
-      : `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="user-check" class="w-3 h-3 text-sky-400"></i> Teman (&lt;${formatCompactNumber(state.officialThreshold)})</span>`;
+      ? `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i> Official (&gt;${formatCompactNumber(state.officialThreshold)})</span>`
+      : `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i> Teman (&lt;${formatCompactNumber(state.officialThreshold)})</span>`;
 
     const privateBadgeHtml = user.is_private
-      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold badge-private flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3 text-emerald-400"></i> Gembok</span>`
+      ? `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-private flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3 text-emerald-400"></i> Gembok</span>`
       : '';
 
     const toggleBtnHtml = isOfficial
-      ? `<button onclick="toggleUserOverride('${user.username}')" title="Pindahkan ke kelompok Teman" class="text-[11px] px-2.5 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all">
+      ? `<button onclick="toggleUserOverride('${user.username}')" title="Pindahkan ke kelompok Teman" class="text-[11px] px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1.5 transition-all font-semibold">
           <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i>
           <span>Jadikan Teman</span>
         </button>`
-      : `<button onclick="toggleUserOverride('${user.username}')" title="Pindahkan ke kelompok Official" class="text-[11px] px-2.5 py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30 flex items-center gap-1 transition-all">
+      : `<button onclick="toggleUserOverride('${user.username}')" title="Pindahkan ke kelompok Official" class="text-[11px] px-3 py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30 flex items-center gap-1.5 transition-all font-semibold">
           <i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i>
           <span>Jadikan Official</span>
         </button>`;
 
     card.innerHTML = `
-      <div class="flex items-center gap-3.5 min-w-0 flex-1">
-        <div class="w-11 h-11 rounded-full p-[2px] ig-gradient-bg flex-shrink-0 overflow-hidden">
+      <div class="flex items-start gap-3.5 min-w-0">
+        <div class="w-12 h-12 rounded-full p-[2px] ig-gradient-bg flex-shrink-0 overflow-hidden shadow-md">
           ${avatarHtml}
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="font-bold text-slate-100 truncate text-sm hover:text-pink-400 transition-colors cursor-pointer" onclick="window.open('${user.href}', '_blank')">
+            <span class="font-extrabold text-slate-100 text-base hover:text-pink-400 transition-colors cursor-pointer break-all" onclick="window.open('${user.href}', '_blank')">
               @${user.username}
             </span>
             ${verifiedSvg}
-            ${user.full_name ? `<span class="text-xs text-slate-400 truncate max-w-[150px]">(${user.full_name})</span>` : ''}
+            ${user.full_name ? `<span class="text-xs text-slate-400 font-medium break-words">(${user.full_name})</span>` : ''}
           </div>
-          <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-            <span class="text-[11px] px-2 py-0.5 rounded-full font-medium ${badgeClass}">${badgeText}</span>
+          <div class="flex items-center gap-2 mt-2 flex-wrap">
+            <span class="text-[11px] px-2.5 py-0.5 rounded-full font-medium ${badgeClass}">${badgeText}</span>
             ${classBadgeHtml}
             ${privateBadgeHtml}
-            ${followersText ? `<span class="text-[11px] text-slate-400 font-mono px-1.5 py-0.5 rounded bg-slate-800/80">${followersText}</span>` : ''}
+            ${followersText ? `<span class="text-[11px] text-amber-300 font-mono font-bold px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3 text-amber-400"></i> ${followersText}</span>` : ''}
             ${timeText ? `<span class="text-[11px] text-slate-500 font-mono">${timeText}</span>` : ''}
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
-        ${toggleBtnHtml}
-        <button onclick="copyUsername('${user.username}', this)" title="Salin ID" class="p-2 rounded-xl bg-slate-800/80 hover:bg-pink-500/20 text-slate-400 hover:text-pink-300 border border-slate-700/60 hover:border-pink-500/40 transition-all">
-          <i data-lucide="copy" class="w-4 h-4"></i>
-        </button>
-        <a href="${user.href}" target="_blank" rel="noopener noreferrer" title="Buka Instagram" class="p-2 rounded-xl bg-slate-800/80 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 border border-slate-700/60 hover:border-sky-500/40 transition-all">
-          <i data-lucide="external-link" class="w-4 h-4"></i>
-        </a>
+
+      <!-- Card Bottom Footer (Never squished) -->
+      <div class="flex items-center justify-between gap-2 pt-3 mt-1 border-t border-slate-800/80 flex-wrap">
+        <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+          <span>Kategori:</span>
+          <strong class="${isOfficial ? 'text-pink-400 font-bold' : 'text-sky-300 font-bold'}">${isOfficial ? 'Official / Artis' : 'Akun Teman'}</strong>
+        </div>
+        <div class="flex items-center gap-2">
+          ${toggleBtnHtml}
+          <button onclick="copyUsername('${user.username}', this)" title="Salin ID" class="p-2 rounded-xl bg-slate-800/80 hover:bg-pink-500/20 text-slate-400 hover:text-pink-300 border border-slate-700/60 hover:border-pink-500/40 transition-all flex items-center gap-1 text-xs">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span class="text-[11px] hidden sm:inline">Salin</span>
+          </button>
+          <a href="${user.href}" target="_blank" rel="noopener noreferrer" title="Buka Profil Instagram" class="p-2 rounded-xl bg-slate-800/80 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 border border-slate-700/60 hover:border-sky-500/40 transition-all flex items-center gap-1 text-xs">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span class="text-[11px] hidden sm:inline">Buka IG</span>
+          </a>
+        </div>
       </div>
     `;
 
@@ -795,7 +865,9 @@ function showResultsSection() {
   const resultsSection = document.getElementById('results-section');
   if (resultsSection) {
     resultsSection.classList.remove('hidden');
-    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const yOffset = -90;
+    const y = resultsSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
   }
 }
 
@@ -1048,21 +1120,17 @@ function initDemoButton() {
 
     const sampleFollowing = [
       // Akun Official / Selebgram / Brand (> 10k & Verified)
+      { username: 'hokben_id', full_name: 'HokBen', is_verified: true, follower_count: 1200000, is_private: false },
       { username: 'cristiano', full_name: 'Cristiano Ronaldo', is_verified: true, follower_count: 640000000, is_private: false },
       { username: 'apple', full_name: 'Apple', is_verified: true, follower_count: 32000000, is_private: false },
-      { username: 'spotify', full_name: 'Spotify', is_verified: true, follower_count: 12500000, is_private: false },
       { username: 'folkative', full_name: 'FOLKATIVE™', is_verified: true, follower_count: 4200000, is_private: false },
-      { username: 'najwashihab', full_name: 'Najwa Shihab', is_verified: true, follower_count: 24500000, is_private: false },
       { username: 'techcrunch', full_name: 'TechCrunch', is_verified: true, follower_count: 1800000, is_private: false },
-      { username: 'nike', full_name: 'Nike', is_verified: true, follower_count: 305000000, is_private: false },
       
       // Akun Teman / Personal (< 10k & Private)
+      { username: 'kokopcoffee', full_name: 'KOKOP COFFEE', is_verified: false, follower_count: 31, is_private: false },
       { username: 'budi_santoso', full_name: 'Budi Santoso', is_verified: false, follower_count: 420, is_private: true },
       { username: 'citra.kartika', full_name: 'Citra Kartika', is_verified: false, follower_count: 680, is_private: true },
-      { username: 'reza_permana', full_name: 'Reza Permana', is_verified: false, follower_count: 1250, is_private: false },
-      { username: 'adit_creative', full_name: 'Aditya Studio', is_verified: false, follower_count: 2300, is_private: false },
       { username: 'dimas.kurniawan', full_name: 'Dimas K.', is_verified: false, follower_count: 310, is_private: true },
-      { username: 'maya_lestari', full_name: 'Maya Lestari', is_verified: false, follower_count: 550, is_private: true },
       { username: 'kopi_senja_jkt', full_name: 'Kopi Senja Jakarta', is_verified: false, follower_count: 8500, is_private: false },
       
       // Mutuals
