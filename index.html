@@ -78,7 +78,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="font-cinzel text-2xl font-black tracking-wider ig-gradient-text">NOAH<span class="text-white font-sans font-extrabold tracking-tight">IG</span></span>
-            <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20 font-mono">v1.3</span>
+            <span class="text-[10px] uppercase font-extrabold tracking-widest px-2.5 py-0.5 rounded-full bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-sky-500/20 text-pink-300 border border-pink-500/40 font-mono shadow-sm">v2.0 &bull; Smart Filter</span>
           </div>
           <p class="text-xs text-slate-400 font-medium">
             Navigasi Relasi Instagram &bull; By <a href="https://instagram.com/dferdiantn" target="_blank" rel="noopener noreferrer" class="text-pink-400 hover:text-pink-300 font-semibold hover:underline">@dferdiantn</a>
@@ -124,10 +124,16 @@
         <span class="ig-gradient-text">Ga Follow Balik Kamu</span> di Instagram
       </h1>
       
-      <p class="text-slate-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto mb-6">
+      <p class="text-slate-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto mb-3">
         Ketahui akun yang kamu ikuti tapi mereka tidak follow balik dengan <strong class="text-slate-200 font-semibold">Bahtera NoahIG</strong>. 
-        Gunakan <span class="text-amber-400 font-bold">Mode Sat-Set (10 Detik)</span> untuk deteksi instan tanpa nunggu email Meta!
+        Kini dilengkapi <strong class="text-pink-400">Pengelompokan Pintar</strong> untuk memisahkan <b>Akun Teman</b> dan <b>Akun Official / Artis</b>!
       </p>
+
+      <!-- v2.0 Feature Announcement -->
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/90 border border-sky-500/30 text-sky-300 text-xs font-semibold mb-6 shadow-sm">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+        <span>Fitur Baru v2.0: Menu Filter Akun Teman (&lt; 10k) vs Official / Artis (&gt; 10k)</span>
+      </div>
 
       <!-- Quick Fast Action Banner -->
       <div class="inline-flex flex-wrap items-center justify-center gap-3 p-2 px-4 rounded-2xl glass-panel-glow border border-pink-500/30">
@@ -279,7 +285,10 @@
               <i data-lucide="user-x" class="w-5 h-5"></i>
             </div>
             <div class="text-3xl sm:text-4xl font-extrabold text-slate-100" id="stat-unfollowers-count">0</div>
-            <p class="text-xs text-slate-400 mt-1">Kamu follow, mereka tidak</p>
+            <p class="text-xs text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+              <span class="text-sky-300 font-semibold" id="stat-split-friends">0 Teman</span> &bull; 
+              <span class="text-pink-400 font-semibold" id="stat-split-official">0 Official</span>
+            </p>
           </div>
 
           <div class="glass-card rounded-2xl p-5 border-amber-500/30 bg-amber-950/10">
@@ -350,6 +359,54 @@
             </button>
           </div>
 
+        </div>
+
+        <!-- v2.0 Sub-Filter Menu: Kelompokkan Akun (Teman vs Official) -->
+        <div id="classification-filter-bar" class="pt-4 pb-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-pink-400"></i>
+              <span>Kelompok:</span>
+            </span>
+            <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
+              <!-- Filter All -->
+              <button id="filter-btn-all" onclick="setClassificationFilter('all')" class="class-filter-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-sky-500/20 text-white border border-pink-500/40 shadow-sm">
+                <span>Semua</span>
+                <span id="filter-count-all" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">0</span>
+              </button>
+              <!-- Filter Friends / Non-Official (< 10k) -->
+              <button id="filter-btn-friends" onclick="setClassificationFilter('friends')" class="class-filter-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent transition-all">
+                <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i>
+                <span>Teman / Non-Official (&lt; 10k)</span>
+                <span id="filter-count-friends" class="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">0</span>
+              </button>
+              <!-- Filter Official / Artis (> 10k / Centang Biru) -->
+              <button id="filter-btn-official" onclick="setClassificationFilter('official')" class="class-filter-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent transition-all">
+                <i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i>
+                <span>Official / Artis (&gt; 10k)</span>
+                <span id="filter-count-official" class="px-1.5 py-0.2 rounded-full text-[10px] bg-pink-500/20 text-pink-300 font-mono">0</span>
+              </button>
+              <!-- Filter Private -->
+              <button id="filter-btn-private" onclick="setClassificationFilter('private')" class="class-filter-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent transition-all">
+                <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Akun Gembok (Private)</span>
+                <span id="filter-count-private" class="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">0</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Threshold Settings Pill -->
+          <div class="flex items-center gap-2 text-xs text-slate-400 bg-slate-900/70 px-3 py-1.5 rounded-xl border border-slate-800">
+            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Batas Akun Official:</span>
+            <select id="threshold-select" onchange="changeThreshold(this.value)" class="bg-slate-800 text-amber-300 font-mono font-bold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-amber-500 cursor-pointer text-xs">
+              <option value="5000">5.000 (5k)</option>
+              <option value="10000" selected>10.000 (10k)</option>
+              <option value="25000">25.000 (25k)</option>
+              <option value="50000">50.000 (50k)</option>
+              <option value="100000">100.000 (100k)</option>
+            </select>
+          </div>
         </div>
 
         <!-- Tab Description Header -->

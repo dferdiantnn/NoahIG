@@ -2,12 +2,12 @@
 
 <div align="center">
 
-![NoahIG Banner](https://img.shields.io/badge/NoahIG-v1.3-e1306c?style=for-the-badge&logo=instagram&logoColor=white)
+![NoahIG Banner](https://img.shields.io/badge/NoahIG-v2.0%20Smart%20Filter-e1306c?style=for-the-badge&logo=instagram&logoColor=white)
 ![Client Side](https://img.shields.io/badge/Security-100%25%20In--Memory%20Safe-10b981?style=for-the-badge&logo=shield)
 ![Zero Backend](https://img.shields.io/badge/Backend-Zero%20Storage-0ea5e9?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
 
-**Temukan siapa saja yang tidak follow back akun Instagram kamu secara 100% aman, instan (Sat-Set 10 Detik), dan bebas risiko hack / banned!**
+**Temukan siapa saja yang tidak follow back akun Instagram kamu secara 100% aman, instan (Sat-Set 10 Detik), dan otomatis dikelompokkan antara Akun Teman (< 10k) vs Official / Artis (> 10k)!**
 
 Created with ❤️ by **[Dwi Ferdiantono](https://instagram.com/dferdiantn)** ([@dferdiantn](https://instagram.com/dferdiantn))
 
@@ -23,6 +23,9 @@ Sebagian besar aplikasi pihak ketiga di Play Store / App Store meminta kamu mema
 - 🛡️ **Tanpa Password / Token**: Tidak pernah meminta password atau login akun.
 - 💻 **100% In-Memory (Client-Side)**: Data diekstrak dan diproses di RAM browser kamu sendiri, tidak ada yang diunggah ke cloud/server manapun.
 - ⚡ **Mode Sat-Set (10 Detik Selesai)**: Ekstrak data langsung dari browser aktif tanpa menunggu antrean email Meta.
+- 👥 **Smart Classification (v2.0 Baru!)**: Pisahkan dengan 1 klik antara akun teman sendiri (< 10k / Private) dengan akun artis/seleb/brand (> 10k / Centang Biru).
+- ⚙️ **Batas Followers Fleksibel**: Bebas atur ambang batas akun official (5k, 10k, 25k, 50k, 100k).
+- 🏷️ **1-Klik Pindah Kelompok (Override)**: Pindahkan akun ke kelompok Teman / Official sesuka hati, tersimpan permanen di komputermu.
 - 📦 **Dukungan ZIP Resmi Meta**: Menerima file export JSON resmi dari Pusat Akun (Meta Accounts Center).
 - 📋 **Ekspor Teks Ringan**: 1-Click Copy semua username yang tidak follow back ke clipboard atau unduh file `.txt` sederhana.
 
@@ -31,6 +34,8 @@ Sebagian besar aplikasi pihak ketiga di Play Store / App Store meminta kamu mema
 ## 🚀 Fitur Utama
 
 - ❌ **Deteksi Tidak Follow Back**: Temukan akun yang kamu ikuti tapi mereka tidak mengikuti balik bahteramu.
+- 👥 **Pengelompokan Teman vs Official (v2.0)**: Sub-menu filter untuk melihat hanya akun teman atau hanya akun official.
+- 🔒 **Deteksi Akun Gembok (Private)**: Otomatis mendeteksi akun personal/teman yang diprivat.
 - 🌟 **Fans / Belum Di-Follback**: Temukan pengikut setia yang belum kamu follow back.
 - 🤝 **Sahabat Sekoci (Mutuals)**: Daftar akun yang saling follow.
 - 🔍 **Realtime Search & Filter**: Cari username tertentu secara instan.

@@ -8,6 +8,9 @@ const state = {
   followers: new Map(),
   following: new Map(),
   activeTab: 'unfollowers',
+  classificationFilter: 'all', // 'all' | 'friends' | 'official' | 'private'
+  officialThreshold: 10000,
+  userOverrides: JSON.parse(localStorage.getItem('noahig_custom_overrides') || '{}'),
   searchQuery: '',
   stats: {
     totalFollowers: 0,
@@ -15,7 +18,10 @@ const state = {
     notFollowingBack: [],
     fans: [],
     mutuals: [],
-    ratio: '0%'
+    ratio: '0%',
+    splitFriends: 0,
+    splitOfficial: 0,
+    splitPrivate: 0
   },
   hasAnalyzed: false
 };
@@ -85,7 +91,11 @@ const SATSET_SCRIPT = `
           targetArray.push({
             username: u.username,
             href: \`https://www.instagram.com/\${u.username}\`,
-            full_name: u.full_name,
+            full_name: u.full_name || '',
+            is_verified: !!u.is_verified,
+            is_private: !!u.is_private,
+            profile_pic_url: u.profile_pic_url || '',
+            follower_count: typeof u.follower_count === 'number' ? u.follower_count : null,
             timestamp: null
           });
           count++;
@@ -229,7 +239,12 @@ function parseInstagramJSON(jsonObj) {
 
     username = username.trim().toLowerCase().replace(/^@/, '');
     if (username) {
-      return { username, href, timestamp };
+      const is_verified = !!item.is_verified;
+      const is_private = !!item.is_private;
+      const profile_pic_url = item.profile_pic_url || '';
+      const full_name = item.full_name || '';
+      const follower_count = typeof item.follower_count === 'number' ? item.follower_count : null;
+      return { username, href, timestamp, is_verified, is_private, profile_pic_url, full_name, follower_count };
     }
     return null;
   };
@@ -410,6 +425,113 @@ function updateFileBadges() {
 }
 
 /**
+ * Smart Account Classification Helper (v2.0)
+ */
+function getUserClassification(user) {
+  if (!user) return 'friend';
+  const uname = (user.username || '').toLowerCase();
+
+  // 1. User manual override (saved in localStorage)
+  if (state.userOverrides && state.userOverrides[uname]) {
+    return state.userOverrides[uname]; // 'official' or 'friend'
+  }
+
+  // 2. Verified accounts (centang biru) are guaranteed official / public figures / brands
+  if (user.is_verified) {
+    return 'official';
+  }
+
+  // 3. Known follower count comparison
+  if (typeof user.follower_count === 'number' && user.follower_count > 0) {
+    return user.follower_count >= state.officialThreshold ? 'official' : 'friend';
+  }
+
+  // 4. Private accounts are virtually always personal/friend accounts
+  if (user.is_private) {
+    return 'friend';
+  }
+
+  // 5. Default unverified accounts without known count are personal/friends
+  return 'friend';
+}
+
+function calculateClassificationStats() {
+  const unfollowers = state.stats.notFollowingBack || [];
+  let friendsCount = 0;
+  let officialCount = 0;
+  let privateCount = 0;
+
+  unfollowers.forEach(u => {
+    const cls = getUserClassification(u);
+    if (cls === 'official') officialCount++;
+    else friendsCount++;
+
+    if (u.is_private) privateCount++;
+  });
+
+  state.stats.splitFriends = friendsCount;
+  state.stats.splitOfficial = officialCount;
+  state.stats.splitPrivate = privateCount;
+}
+
+window.toggleUserOverride = function(username) {
+  if (!username) return;
+  const uname = username.toLowerCase();
+  const user = state.following.get(uname) || state.followers.get(uname) || { username: uname };
+  const current = getUserClassification(user);
+
+  if (current === 'official') {
+    state.userOverrides[uname] = 'friend';
+    showToast(`👥 @${username} dipindahkan ke kelompok Teman!`, 'success');
+  } else {
+    state.userOverrides[uname] = 'official';
+    showToast(`🏢 @${username} dipindahkan ke kelompok Official!`, 'success');
+  }
+
+  localStorage.setItem('noahig_custom_overrides', JSON.stringify(state.userOverrides));
+  calculateClassificationStats();
+  renderStats();
+  renderList();
+};
+
+window.setClassificationFilter = function(filterType) {
+  state.classificationFilter = filterType;
+
+  const btnMap = {
+    all: document.getElementById('filter-btn-all'),
+    friends: document.getElementById('filter-btn-friends'),
+    official: document.getElementById('filter-btn-official'),
+    private: document.getElementById('filter-btn-private')
+  };
+
+  Object.entries(btnMap).forEach(([key, btn]) => {
+    if (!btn) return;
+    if (key === filterType) {
+      btn.className = 'class-filter-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-sky-500/20 text-white border border-pink-500/40 shadow-sm';
+    } else {
+      btn.className = 'class-filter-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent transition-all';
+    }
+  });
+
+  renderList();
+};
+
+window.changeThreshold = function(val) {
+  state.officialThreshold = parseInt(val, 10) || 10000;
+  showToast(`⚙️ Ambang batas official: ${formatCompactNumber(state.officialThreshold)}`, 'info');
+  calculateClassificationStats();
+  renderStats();
+  renderList();
+};
+
+function formatCompactNumber(num) {
+  if (!num) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace('.0', '') + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1).replace('.0', '') + 'k';
+  return num.toString();
+}
+
+/**
  * Execute Relationship Calculation
  */
 function runAnalysis() {
@@ -441,16 +563,20 @@ function runAnalysis() {
     notFollowingBack,
     fans,
     mutuals,
-    ratio: ratioVal
+    ratio: ratioVal,
+    splitFriends: 0,
+    splitOfficial: 0,
+    splitPrivate: 0
   };
 
   state.hasAnalyzed = true;
 
+  calculateClassificationStats();
   renderStats();
   renderList();
   showResultsSection();
 
-  showToast(`🎯 Analisis Bahtera Selesai! Ditemukan ${notFollowingBack.length} akun tidak follow back.`, 'success');
+  showToast(`🎯 Analisis Selesai! ${notFollowingBack.length} akun tidak follback (${state.stats.splitFriends} teman, ${state.stats.splitOfficial} official).`, 'success');
   
   if (typeof confetti === 'function') {
     confetti({
@@ -487,6 +613,23 @@ function renderStats() {
   if (tabUnfollowersCount) tabUnfollowersCount.textContent = state.stats.notFollowingBack.length;
   if (tabFansCount) tabFansCount.textContent = state.stats.fans.length;
   if (tabMutualsCount) tabMutualsCount.textContent = state.stats.mutuals.length;
+
+  // v2.0 Friends vs Official split
+  const splitFriendsEl = document.getElementById('stat-split-friends');
+  const splitOfficialEl = document.getElementById('stat-split-official');
+  if (splitFriendsEl) splitFriendsEl.textContent = `${state.stats.splitFriends} Teman`;
+  if (splitOfficialEl) splitOfficialEl.textContent = `${state.stats.splitOfficial} Official`;
+
+  // Sub-filter counts
+  const countAllEl = document.getElementById('filter-count-all');
+  const countFriendsEl = document.getElementById('filter-count-friends');
+  const countOfficialEl = document.getElementById('filter-count-official');
+  const countPrivateEl = document.getElementById('filter-count-private');
+
+  if (countAllEl) countAllEl.textContent = state.stats.notFollowingBack.length;
+  if (countFriendsEl) countFriendsEl.textContent = state.stats.splitFriends;
+  if (countOfficialEl) countOfficialEl.textContent = state.stats.splitOfficial;
+  if (countPrivateEl) countPrivateEl.textContent = state.stats.splitPrivate;
 }
 
 /**
@@ -498,6 +641,7 @@ function renderList() {
   const currentTabTitle = document.getElementById('current-tab-title');
   const currentTabDesc = document.getElementById('current-tab-desc');
   const currentExportCount = document.getElementById('current-export-count');
+  const classFilterBar = document.getElementById('classification-filter-bar');
 
   if (!container) return;
 
@@ -511,24 +655,38 @@ function renderList() {
     badgeText = 'Tidak Follback';
     if (currentTabTitle) currentTabTitle.innerHTML = `<i data-lucide="user-x" class="w-5 h-5 text-rose-400"></i> Akun Tidak Follow Back`;
     if (currentTabDesc) currentTabDesc.textContent = 'Daftar akun yang kamu ikuti, tetapi mereka tidak mengikuti balik bahteramu.';
+    if (classFilterBar) classFilterBar.classList.remove('hidden');
   } else if (state.activeTab === 'fans') {
     currentList = state.stats.fans;
     badgeClass = 'badge-fan';
     badgeText = 'Penggemar (Fan)';
     if (currentTabTitle) currentTabTitle.innerHTML = `<i data-lucide="heart" class="w-5 h-5 text-amber-400"></i> Penumpang Setia (Fans)`;
     if (currentTabDesc) currentTabDesc.textContent = 'Daftar akun yang mengikuti kamu, tetapi belum kamu ikuti balik.';
+    if (classFilterBar) classFilterBar.classList.remove('hidden');
   } else if (state.activeTab === 'mutuals') {
     currentList = state.stats.mutuals;
     badgeClass = 'badge-mutual';
     badgeText = 'Saling Follow';
     if (currentTabTitle) currentTabTitle.innerHTML = `<i data-lucide="users" class="w-5 h-5 text-emerald-400"></i> Sahabat Sekoci (Mutuals)`;
     if (currentTabDesc) currentTabDesc.textContent = 'Daftar akun yang saling mengikuti secara harmonis.';
+    if (classFilterBar) classFilterBar.classList.remove('hidden');
   }
 
+  // 1. Classification Sub-Filter (v2.0)
+  let classFiltered = currentList;
+  if (state.classificationFilter === 'friends') {
+    classFiltered = currentList.filter(u => getUserClassification(u) === 'friend');
+  } else if (state.classificationFilter === 'official') {
+    classFiltered = currentList.filter(u => getUserClassification(u) === 'official');
+  } else if (state.classificationFilter === 'private') {
+    classFiltered = currentList.filter(u => !!u.is_private);
+  }
+
+  // 2. Search Query Filter
   const query = state.searchQuery.trim().toLowerCase();
   const filtered = query
-    ? currentList.filter(item => item.username.toLowerCase().includes(query))
-    : currentList;
+    ? classFiltered.filter(item => item.username.toLowerCase().includes(query) || (item.full_name && item.full_name.toLowerCase().includes(query)))
+    : classFiltered;
 
   if (currentExportCount) currentExportCount.textContent = `${filtered.length} Akun`;
 
@@ -548,38 +706,76 @@ function renderList() {
 
   filtered.forEach((user) => {
     const card = document.createElement('div');
-    card.className = 'glass-card rounded-2xl p-4 flex items-center justify-between gap-3 group relative overflow-hidden';
+    card.className = 'glass-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 group relative overflow-hidden transition-all duration-200';
     
+    const classification = getUserClassification(user);
+    const isOfficial = classification === 'official';
+
     let timeText = '';
     if (user.timestamp) {
       const date = new Date(user.timestamp * 1000);
       timeText = date.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
+    let followersText = '';
+    if (typeof user.follower_count === 'number' && user.follower_count > 0) {
+      followersText = `${formatCompactNumber(user.follower_count)} pengikut`;
+    }
+
+    const avatarHtml = user.profile_pic_url
+      ? `<img src="${user.profile_pic_url}" alt="${user.username}" class="w-full h-full rounded-full object-cover" onerror="this.onerror=null;this.parentNode.innerHTML='<div class=\\'w-full h-full rounded-full bg-slate-900 flex items-center justify-center font-bold text-sm text-slate-200 uppercase\\'>${user.username.charAt(0)}</div>';">`
+      : `<div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center font-bold text-sm text-slate-200 uppercase">${user.username.charAt(0)}</div>`;
+
+    const verifiedSvg = user.is_verified
+      ? `<span title="Official Terverifikasi (Centang Biru)" class="inline-flex text-sky-400 flex-shrink-0"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5l-4-4 1.41-1.41L11 13.67l6.59-6.59L19 8.5l-8 8z"/></svg></span>`
+      : '';
+
+    const classBadgeHtml = isOfficial
+      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="badge-check" class="w-3 h-3 text-pink-400"></i> Official (&gt;${formatCompactNumber(state.officialThreshold)})</span>`
+      : `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="user-check" class="w-3 h-3 text-sky-400"></i> Teman (&lt;${formatCompactNumber(state.officialThreshold)})</span>`;
+
+    const privateBadgeHtml = user.is_private
+      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold badge-private flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3 text-emerald-400"></i> Gembok</span>`
+      : '';
+
+    const toggleBtnHtml = isOfficial
+      ? `<button onclick="toggleUserOverride('${user.username}')" title="Pindahkan ke kelompok Teman" class="text-[11px] px-2.5 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1 transition-all">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span>Jadikan Teman</span>
+        </button>`
+      : `<button onclick="toggleUserOverride('${user.username}')" title="Pindahkan ke kelompok Official" class="text-[11px] px-2.5 py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30 flex items-center gap-1 transition-all">
+          <i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i>
+          <span>Jadikan Official</span>
+        </button>`;
+
     card.innerHTML = `
-      <div class="flex items-center gap-3.5 min-w-0">
-        <div class="w-11 h-11 rounded-full p-[2px] ig-gradient-bg flex-shrink-0">
-          <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center font-bold text-sm text-slate-200 uppercase">
-            ${user.username.charAt(0)}
-          </div>
+      <div class="flex items-center gap-3.5 min-w-0 flex-1">
+        <div class="w-11 h-11 rounded-full p-[2px] ig-gradient-bg flex-shrink-0 overflow-hidden">
+          ${avatarHtml}
         </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-slate-100 truncate text-sm hover:text-pink-400 transition-colors cursor-pointer" onclick="window.open('${user.href}', '_blank')">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-bold text-slate-100 truncate text-sm hover:text-pink-400 transition-colors cursor-pointer" onclick="window.open('${user.href}', '_blank')">
               @${user.username}
             </span>
+            ${verifiedSvg}
+            ${user.full_name ? `<span class="text-xs text-slate-400 truncate max-w-[150px]">(${user.full_name})</span>` : ''}
           </div>
-          <div class="flex items-center gap-2 mt-0.5">
+          <div class="flex items-center gap-1.5 mt-1 flex-wrap">
             <span class="text-[11px] px-2 py-0.5 rounded-full font-medium ${badgeClass}">${badgeText}</span>
+            ${classBadgeHtml}
+            ${privateBadgeHtml}
+            ${followersText ? `<span class="text-[11px] text-slate-400 font-mono px-1.5 py-0.5 rounded bg-slate-800/80">${followersText}</span>` : ''}
             ${timeText ? `<span class="text-[11px] text-slate-500 font-mono">${timeText}</span>` : ''}
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-1.5 flex-shrink-0">
+      <div class="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+        ${toggleBtnHtml}
         <button onclick="copyUsername('${user.username}', this)" title="Salin ID" class="p-2 rounded-xl bg-slate-800/80 hover:bg-pink-500/20 text-slate-400 hover:text-pink-300 border border-slate-700/60 hover:border-pink-500/40 transition-all">
           <i data-lucide="copy" class="w-4 h-4"></i>
         </button>
-        <a href="${user.href}" target="_blank" rel="noopener noreferrer" title="Buka Profil Instagram" class="p-2 rounded-xl bg-slate-800/80 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 border border-slate-700/60 hover:border-sky-500/40 transition-all">
+        <a href="${user.href}" target="_blank" rel="noopener noreferrer" title="Buka Instagram" class="p-2 rounded-xl bg-slate-800/80 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 border border-slate-700/60 hover:border-sky-500/40 transition-all">
           <i data-lucide="external-link" class="w-4 h-4"></i>
         </a>
       </div>
@@ -633,6 +829,14 @@ window.copyAllCurrentIDs = async function() {
   else if (state.activeTab === 'fans') list = state.stats.fans;
   else if (state.activeTab === 'mutuals') list = state.stats.mutuals;
 
+  if (state.classificationFilter === 'friends') {
+    list = list.filter(u => getUserClassification(u) === 'friend');
+  } else if (state.classificationFilter === 'official') {
+    list = list.filter(u => getUserClassification(u) === 'official');
+  } else if (state.classificationFilter === 'private') {
+    list = list.filter(u => !!u.is_private);
+  }
+
   const query = state.searchQuery.trim().toLowerCase();
   const filtered = query ? list.filter(u => u.username.toLowerCase().includes(query)) : list;
 
@@ -667,6 +871,17 @@ window.downloadTxtFile = function() {
   } else if (state.activeTab === 'mutuals') {
     list = state.stats.mutuals;
     filenamePrefix = 'noahig_mutuals';
+  }
+
+  if (state.classificationFilter === 'friends') {
+    list = list.filter(u => getUserClassification(u) === 'friend');
+    filenamePrefix += '_teman';
+  } else if (state.classificationFilter === 'official') {
+    list = list.filter(u => getUserClassification(u) === 'official');
+    filenamePrefix += '_official';
+  } else if (state.classificationFilter === 'private') {
+    list = list.filter(u => !!u.is_private);
+    filenamePrefix += '_private';
   }
 
   const query = state.searchQuery.trim().toLowerCase();
@@ -832,38 +1047,63 @@ function initDemoButton() {
     state.following.clear();
 
     const sampleFollowing = [
-      'noah_ocean_rider', 'cyber_sailor', 'cristiano', 'leomessi', 'taylorswift',
-      'natgeo', 'nasa', 'zuck', 'billgates', 'elonmusk', 'instagram', 'nike',
-      'steve_voyager', 'aurora_borealis', 'kopi_senja_jakarta', 'tech_insider_id',
-      'explore_bali', 'developer_nusantara', 'pixel_art_lab', 'maritime_legend'
+      // Akun Official / Selebgram / Brand (> 10k & Verified)
+      { username: 'cristiano', full_name: 'Cristiano Ronaldo', is_verified: true, follower_count: 640000000, is_private: false },
+      { username: 'apple', full_name: 'Apple', is_verified: true, follower_count: 32000000, is_private: false },
+      { username: 'spotify', full_name: 'Spotify', is_verified: true, follower_count: 12500000, is_private: false },
+      { username: 'folkative', full_name: 'FOLKATIVE™', is_verified: true, follower_count: 4200000, is_private: false },
+      { username: 'najwashihab', full_name: 'Najwa Shihab', is_verified: true, follower_count: 24500000, is_private: false },
+      { username: 'techcrunch', full_name: 'TechCrunch', is_verified: true, follower_count: 1800000, is_private: false },
+      { username: 'nike', full_name: 'Nike', is_verified: true, follower_count: 305000000, is_private: false },
+      
+      // Akun Teman / Personal (< 10k & Private)
+      { username: 'budi_santoso', full_name: 'Budi Santoso', is_verified: false, follower_count: 420, is_private: true },
+      { username: 'citra.kartika', full_name: 'Citra Kartika', is_verified: false, follower_count: 680, is_private: true },
+      { username: 'reza_permana', full_name: 'Reza Permana', is_verified: false, follower_count: 1250, is_private: false },
+      { username: 'adit_creative', full_name: 'Aditya Studio', is_verified: false, follower_count: 2300, is_private: false },
+      { username: 'dimas.kurniawan', full_name: 'Dimas K.', is_verified: false, follower_count: 310, is_private: true },
+      { username: 'maya_lestari', full_name: 'Maya Lestari', is_verified: false, follower_count: 550, is_private: true },
+      { username: 'kopi_senja_jkt', full_name: 'Kopi Senja Jakarta', is_verified: false, follower_count: 8500, is_private: false },
+      
+      // Mutuals
+      { username: 'cyber_sailor', full_name: 'Cyber Sailor', is_verified: false, follower_count: 150, is_private: false },
+      { username: 'noah_ocean_rider', full_name: 'Noah Rider', is_verified: false, follower_count: 320, is_private: false }
     ];
 
     const sampleFollowers = [
-      'noah_ocean_rider', 'cyber_sailor', 'steve_voyager', 'aurora_borealis',
-      'kopi_senja_jakarta', 'tech_insider_id', 'pixel_art_lab', 'maritime_legend',
-      'loyal_fan_01', 'loyal_fan_02', 'secret_admirer_id', 'indonesia_traveler',
-      'creative_studio_bali'
+      { username: 'cyber_sailor', full_name: 'Cyber Sailor', is_verified: false, follower_count: 150, is_private: false },
+      { username: 'noah_ocean_rider', full_name: 'Noah Rider', is_verified: false, follower_count: 320, is_private: false },
+      { username: 'fan_setia_01', full_name: 'Fans Noah 01', is_verified: false, follower_count: 80, is_private: false },
+      { username: 'kawan_lama_bandung', full_name: 'Kawan Lama', is_verified: false, follower_count: 610, is_private: true }
     ];
 
     sampleFollowing.forEach(u => {
-      state.following.set(u, {
-        username: u,
-        href: `https://www.instagram.com/${u}`,
+      state.following.set(u.username, {
+        username: u.username,
+        full_name: u.full_name,
+        is_verified: u.is_verified,
+        is_private: u.is_private,
+        follower_count: u.follower_count,
+        href: `https://www.instagram.com/${u.username}`,
         timestamp: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 86400 * 30)
       });
     });
 
     sampleFollowers.forEach(u => {
-      state.followers.set(u, {
-        username: u,
-        href: `https://www.instagram.com/${u}`,
+      state.followers.set(u.username, {
+        username: u.username,
+        full_name: u.full_name,
+        is_verified: u.is_verified,
+        is_private: u.is_private,
+        follower_count: u.follower_count,
+        href: `https://www.instagram.com/${u.username}`,
         timestamp: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 86400 * 30)
       });
     });
 
     updateFileBadges();
     runAnalysis();
-    showToast('🚀 Simulasi data bahtera berhasil dimuat!', 'success');
+    showToast('🚀 Demo NoahIG v2.0 berhasil dimuat! Coba klik filter "Teman" & "Official"!', 'success');
   });
 }
 

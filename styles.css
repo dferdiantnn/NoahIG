@@ -280,3 +280,44 @@ body {
 .pulse-beacon {
   animation: beacon-ping 2s infinite cubic-bezier(0.45, 0, 0.55, 1);
 }
+
+/* v2.0 Smart Classification Badges */
+.badge-unfollower {
+  background: rgba(244, 63, 94, 0.18);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+.badge-fan {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.badge-mutual {
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.badge-official {
+  background: linear-gradient(135deg, rgba(193, 53, 132, 0.25), rgba(225, 48, 108, 0.25));
+  color: #f472b6;
+  border: 1px solid rgba(225, 48, 108, 0.4);
+}
+
+.badge-friend {
+  background: rgba(14, 165, 233, 0.18);
+  color: #7dd3fc;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+.badge-private {
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.class-filter-btn {
+  user-select: none;
+}
