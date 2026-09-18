@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![NoahIG Banner](https://img.shields.io/badge/NoahIG-v2.0%20Smart%20Filter-e1306c?style=for-the-badge&logo=instagram&logoColor=white)
+![NoahIG Banner](https://img.shields.io/badge/NoahIG-v2.1%20Smart%2010k%20Filter-e1306c?style=for-the-badge&logo=instagram&logoColor=white)
 ![Client Side](https://img.shields.io/badge/Security-100%25%20In--Memory%20Safe-10b981?style=for-the-badge&logo=shield)
 ![Zero Backend](https://img.shields.io/badge/Backend-Zero%20Storage-0ea5e9?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
@@ -23,7 +23,7 @@ Sebagian besar aplikasi pihak ketiga di Play Store / App Store meminta kamu mema
 - 🛡️ **Tanpa Password / Token**: Tidak pernah meminta password atau login akun.
 - 💻 **100% In-Memory (Client-Side)**: Data diekstrak dan diproses di RAM browser kamu sendiri, tidak ada yang diunggah ke cloud/server manapun.
 - ⚡ **Mode Sat-Set (10 Detik Selesai)**: Ekstrak data langsung dari browser aktif tanpa menunggu antrean email Meta.
-- 👥 **Smart Classification (v2.0 Baru!)**: Pisahkan dengan 1 klik antara akun teman sendiri (< 10k / Private) dengan akun artis/seleb/brand (> 10k / Centang Biru).
+- 👥 **Smart Classification (v2.1 Baru!)**: Pisahkan dengan 1 klik antara akun teman sendiri (< 10k / Private) dengan akun artis/seleb/brand (>= 10k Pengikut Asli / Centang Biru).
 - ⚙️ **Batas Followers Fleksibel**: Bebas atur ambang batas akun official (5k, 10k, 25k, 50k, 100k).
 - 🏷️ **1-Klik Pindah Kelompok (Override)**: Pindahkan akun ke kelompok Teman / Official sesuka hati, tersimpan permanen di komputermu.
 - 📦 **Dukungan ZIP Resmi Meta**: Menerima file export JSON resmi dari Pusat Akun (Meta Accounts Center).
@@ -34,7 +34,7 @@ Sebagian besar aplikasi pihak ketiga di Play Store / App Store meminta kamu mema
 ## 🚀 Fitur Utama
 
 - ❌ **Deteksi Tidak Follow Back**: Temukan akun yang kamu ikuti tapi mereka tidak mengikuti balik bahteramu.
-- 👥 **Pengelompokan Teman vs Official (v2.0)**: Sub-menu filter untuk melihat hanya akun teman atau hanya akun official.
+- 👥 **Pengelompokan Teman vs Official (v2.1)**: Sub-menu filter untuk melihat hanya akun teman atau hanya akun official.
 - 🔒 **Deteksi Akun Gembok (Private)**: Otomatis mendeteksi akun personal/teman yang diprivat.
 - 🌟 **Fans / Belum Di-Follback**: Temukan pengikut setia yang belum kamu follow back.
 - 🤝 **Sahabat Sekoci (Mutuals)**: Daftar akun yang saling follow.

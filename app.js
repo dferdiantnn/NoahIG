@@ -40,7 +40,7 @@ const SATSET_SCRIPT = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
       <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#833ab4,#e1306c,#fd1d1d,#fcaf45);display:flex;align-items:center;justify-content:center;font-size:18px;">⛵</div>
       <div>
-        <div style="font-weight:800;font-size:14px;background:linear-gradient(135deg,#c13584,#fd1d1d,#fcaf45);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">NOAHIG SAT-SET</div>
+        <div style="font-weight:800;font-size:14px;background:linear-gradient(135deg,#c13584,#fd1d1d,#fcaf45);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">NOAHIG SAT-SET v2.1</div>
         <div id="noahig-status" style="font-size:12px;color:#94a3b8;">Menghubungkan ke Instagram...</div>
       </div>
     </div>
@@ -1171,7 +1171,7 @@ function initDemoButton() {
 
     updateFileBadges();
     runAnalysis();
-    showToast('🚀 Demo NoahIG v2.0 berhasil dimuat! Coba klik filter "Teman" & "Official"!', 'success');
+    showToast('🚀 Demo NoahIG v2.1 berhasil dimuat! HokBen (Official >10k) & Kokop Coffee (Teman <10k)', 'success');
   });
 }
 
