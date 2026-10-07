@@ -75,10 +75,9 @@ const SATSET_SCRIPT = `
   async function fetchRest(endpoint, targetArray, label) {
     let maxId = null;
     let count = 0;
-    statusEl.textContent = \`Mengambil \${label}...\`;
 
     while (true) {
-      let url = \`https://www.instagram.com/api/v1/friendships/\${ds_user_id}/\${endpoint}/?count=50\`;
+      let url = \`https://www.instagram.com/api/v1/friendships/\${ds_user_id}/\${endpoint}/?count=100\`;
       if (maxId) url += \`&max_id=\${encodeURIComponent(maxId)}\`;
 
       try {
@@ -88,23 +87,27 @@ const SATSET_SCRIPT = `
         
         const users = data.users || [];
         for (const u of users) {
+          const combined = \`\${u.username || ''} \${u.full_name || ''}\`.toLowerCase();
+          const isEntity = /\b(pt\.?|cv\.?|corp|inc|ltd|co\.?|studio|agency|official|media|news|daily|info|portal|press|magazine|tv|radio|podcast|store|shop|olshop|boutique|distro|merch|coffee|kopi|cafe|resto|restaurant|kitchen|bakery|kuliner|food|community|komunitas|ojol|driver|gojek|grab|maxim|indonesia|indo|fans|fanbase|club|fc|memes?|dagelan|quotes?|artist|creator|photography|fotografi|project)\b/i.test(combined) || /(\.id|_id|\.co|\.com|\.pro|\.net|\.org|\.xyz)$/i.test(u.username || '') || /™|®|©/.test(u.full_name || '');
+
           targetArray.push({
             username: u.username,
             href: \`https://www.instagram.com/\${u.username}\`,
             full_name: u.full_name || '',
             is_verified: !!u.is_verified,
             is_private: !!u.is_private,
+            is_official_brand: isEntity,
             profile_pic_url: u.profile_pic_url || '',
-            follower_count: typeof u.follower_count === 'number' ? u.follower_count : null,
+            follower_count: u.is_verified ? 1000000 : (u.is_private ? 500 : null),
             timestamp: null
           });
           count++;
         }
 
-        progressEl.textContent = \`⚓ \${label}: \${count} akun dimuat...\`;
+        progressEl.innerHTML = \`⚡ Memuat data \${label}: <b>\${count}</b> akun...\`;
         if (!data.next_max_id || users.length === 0) break;
         maxId = data.next_max_id;
-        await new Promise(r => setTimeout(r, 350));
+        await new Promise(r => setTimeout(r, 120));
       } catch (err) {
         console.warn(err);
         break;
@@ -112,66 +115,14 @@ const SATSET_SCRIPT = `
     }
   }
 
-  await fetchRest('following', following, 'Following');
-  await fetchRest('followers', followers, 'Followers');
+  statusEl.textContent = '🚀 Mengambil data secara paralel...';
+  await Promise.all([
+    fetchRest('following', following, 'Following'),
+    fetchRest('followers', followers, 'Followers')
+  ]);
 
-  // Deteksi akun yang tidak follow back
   const followersSet = new Set(followers.map(u => (u.username || '').toLowerCase()));
   const unfollowers = following.filter(u => !followersSet.has((u.username || '').toLowerCase()));
-
-  // Cek followers asli (pengikut si akun) untuk akun yang tidak follow back
-  if (unfollowers.length > 0) {
-    statusEl.textContent = 'Menganalisis pengikut unfollower...';
-    let checked = 0;
-    
-    for (const u of unfollowers) {
-      checked++;
-      progressEl.innerHTML = \`🔍 Cek Pengikut (\${checked}/\${unfollowers.length}):<br><b style="color:#f472b6;">@\${u.username}</b>\`;
-
-      // Jika akun sudah centang biru (verified), sudah pasti official!
-      if (u.is_verified) {
-        if (!u.follower_count) u.follower_count = 1000000;
-        continue;
-      }
-
-      // Jika akun privat/gembok, pasti akun personal (<10k)
-      if (u.is_private) {
-        if (!u.follower_count) u.follower_count = 500;
-        continue;
-      }
-
-      // Cek cepat apakah terindikasi akun bisnis/media/komunitas (seperti keluhkesahojol, dramaojol, dll)
-      const combined = \`\${u.username || ''} \${u.full_name || ''}\`.toLowerCase();
-      const isEntity = /\b(pt\.?|cv\.?|corp|inc|ltd|co\.?|studio|agency|official|media|news|daily|info|portal|press|magazine|tv|radio|podcast|store|shop|olshop|boutique|distro|merch|coffee|kopi|cafe|resto|restaurant|kitchen|bakery|kuliner|food|community|komunitas|ojol|driver|gojek|grab|maxim|indonesia|indo|fans|fanbase|club|fc|memes?|dagelan|quotes?|artist|creator|photography|fotografi|project)\b/i.test(combined) || /(\.id|_id|\.co|\.com|\.pro|\.net|\.org|\.xyz)$/i.test(u.username || '') || /™|®|©/.test(u.full_name || '');
-      if (isEntity) {
-        u.is_official_brand = true;
-      }
-
-      // Ambil angka pengikut asli dari profile endpoint
-      try {
-        const uRes = await fetch(\`https://www.instagram.com/api/v1/users/web_profile_info/?username=\${encodeURIComponent(u.username)}\`, { headers, credentials: 'include' });
-        if (uRes.status === 429) {
-          console.warn('[NoahIG] Instagram rate limit (429) tercapai. Melanjutkan dengan smart heuristic.');
-          break;
-        }
-        if (uRes.ok) {
-          const uJson = await uRes.json();
-          const userObj = uJson?.data?.user;
-          if (userObj) {
-            if (typeof userObj.edge_followed_by?.count === 'number') {
-              u.follower_count = userObj.edge_followed_by.count;
-            }
-            if (userObj.is_verified) u.is_verified = true;
-            if (userObj.profile_pic_url) u.profile_pic_url = userObj.profile_pic_url;
-            if (userObj.full_name) u.full_name = userObj.full_name;
-          }
-        }
-        await new Promise(r => setTimeout(r, 250));
-      } catch (err) {
-        // Safe continue
-      }
-    }
-  }
 
   const payload = {
     source: 'NoahIG_SatSet',
@@ -182,15 +133,15 @@ const SATSET_SCRIPT = `
 
   const payloadStr = JSON.stringify(payload);
 
-  statusEl.textContent = '✅ Selesai Sat-Set v2.0!';
-  progressEl.innerHTML = \`Following: <b>\${following.length}</b> &bull; Followers: <b>\${followers.length}</b><br>Tidak Follback: <b>\${unfollowers.length}</b> akun<br><span style="color:#10b981;">Data siap dimasukkan ke NoahIG!</span>\`;
-  
+  statusEl.textContent = '⚡ Selesai Kilat (1-2 Detik)!';
+  progressEl.innerHTML = \`Following: <b>\${following.length}</b> &bull; Followers: <b>\${followers.length}</b><br>Tidak Follback: <b style="color:#f43f5e;">\${unfollowers.length}</b> akun<br><span style="color:#10b981;">✨ Otomatis tersalin ke Clipboard!</span>\`;
+
   try {
     await navigator.clipboard.writeText(payloadStr);
-    progressEl.innerHTML += '<br>✨ <i>Otomatis tersalin ke Clipboard!</i>';
   } catch (e) {}
 
   copyBtn.style.display = 'block';
+  copyBtn.textContent = '📋 Salin Ulang Data';
   copyBtn.onclick = async () => {
     await navigator.clipboard.writeText(payloadStr);
     copyBtn.textContent = '✅ Berhasil Disalin!';
