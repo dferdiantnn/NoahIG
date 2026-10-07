@@ -37,21 +37,32 @@ const SATSET_SCRIPT = `
   box.id = 'noahig-overlay';
   box.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:999999;background:#090d1a;color:#fff;padding:20px;border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,0.8);border:2px solid #e1306c;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:360px;min-width:300px;';
   box.innerHTML = \`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#833ab4,#e1306c,#fd1d1d,#fcaf45);display:flex;align-items:center;justify-content:center;font-size:18px;">⛵</div>
-      <div>
-        <div style="font-weight:800;font-size:14px;background:linear-gradient(135deg,#c13584,#fd1d1d,#fcaf45);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">NOAHIG SAT-SET v2.1</div>
-        <div id="noahig-status" style="font-size:12px;color:#94a3b8;">Menghubungkan ke Instagram...</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#833ab4,#e1306c,#fd1d1d,#fcaf45);display:flex;align-items:center;justify-content:center;font-size:18px;">⛵</div>
+        <div>
+          <div style="font-weight:800;font-size:14px;background:linear-gradient(135deg,#c13584,#fd1d1d,#fcaf45);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">NOAHIG SAT-SET v3.0</div>
+          <div id="noahig-status" style="font-size:12px;color:#94a3b8;">Menghubungkan ke Instagram...</div>
+        </div>
       </div>
+      <button id="noahig-btn-close" title="Tutup" style="background:transparent;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:8px;line-height:1;">✕</button>
     </div>
     <div id="noahig-progress" style="font-size:12px;color:#38bdf8;margin-bottom:14px;background:#030712;padding:10px;border-radius:10px;font-family:monospace;">Memulai ekstraksi...</div>
-    <button id="noahig-btn-copy" style="display:none;width:100%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:10px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:13px;">📋 Salin Data ke NoahIG</button>
+    <div style="display:flex;gap:8px;">
+      <button id="noahig-btn-copy" style="display:none;flex:1;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;padding:10px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:13px;">📋 Salin Data ke NoahIG</button>
+      <button id="noahig-btn-dismiss" style="display:none;background:#1e293b;color:#cbd5e1;border:1px solid #334155;padding:10px 14px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:13px;">Tutup</button>
+    </div>
   \`;
   document.body.appendChild(box);
 
   const statusEl = document.getElementById('noahig-status');
   const progressEl = document.getElementById('noahig-progress');
   const copyBtn = document.getElementById('noahig-btn-copy');
+  const closeBtn = document.getElementById('noahig-btn-close');
+  const dismissBtn = document.getElementById('noahig-btn-dismiss');
+
+  if (closeBtn) closeBtn.onclick = () => box.remove();
+  if (dismissBtn) dismissBtn.onclick = () => box.remove();
 
   const ds_user_id = document.cookie.match(/ds_user_id=([0-9]+)/)?.[1];
   const csrfToken = document.cookie.match(/csrftoken=([a-zA-Z0-9_-]+)/)?.[1] || '';
@@ -141,6 +152,7 @@ const SATSET_SCRIPT = `
   } catch (e) {}
 
   copyBtn.style.display = 'block';
+  dismissBtn.style.display = 'block';
   copyBtn.textContent = '📋 Salin Ulang Data';
   copyBtn.onclick = async () => {
     await navigator.clipboard.writeText(payloadStr);
