@@ -3,11 +3,14 @@
 <div align="center">
 
 ![NoahIG Banner](https://img.shields.io/badge/NoahIG-v2.1%20Smart%2010k%20Filter-e1306c?style=for-the-badge&logo=instagram&logoColor=white)
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20App-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://noahig.vercel.app)
 ![Client Side](https://img.shields.io/badge/Security-100%25%20In--Memory%20Safe-10b981?style=for-the-badge&logo=shield)
 ![Zero Backend](https://img.shields.io/badge/Backend-Zero%20Storage-0ea5e9?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
 
 **Temukan siapa saja yang tidak follow back akun Instagram kamu secara 100% aman, instan (Sat-Set 10 Detik), dan otomatis dikelompokkan antara Akun Teman (< 10k) vs Official / Artis (> 10k)!**
+
+🚀 **Live Web App:** [https://noahig.vercel.app](https://noahig.vercel.app) *(Mirror: [GitHub Pages](https://dferdiantnn.github.io/NoahIG/))*
 
 Created with ❤️ by **[Dwi Ferdiantono](https://instagram.com/dferdiantn)** ([@dferdiantn](https://instagram.com/dferdiantn))
 
@@ -45,7 +48,7 @@ Sebagian besar aplikasi pihak ketiga di Play Store / App Store meminta kamu mema
 
 ## ⚡ Cara Menggunakan (Mode Sat-Set)
 
-1. Buka **[NoahIG](https://dferdiantnn.github.io/NoahIG)** (atau jalankan secara lokal).
+1. Buka **[NoahIG (Vercel)](https://noahig.vercel.app)** atau **[GitHub Pages](https://dferdiantnn.github.io/NoahIG)** (atau jalankan secara lokal).
 2. Klik tombol **"Mode Sat-Set (10 Detik)"** di kanan atas & klik **"Salin Script"**.
 3. Buka tab baru [instagram.com](https://www.instagram.com) (pastikan sudah login):
    - **Mac Safari**: Tekan `Cmd + Option + I` &rarr; tab **Console**
