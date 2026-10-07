@@ -140,9 +140,20 @@ const SATSET_SCRIPT = `
         continue;
       }
 
+      // Cek cepat apakah terindikasi akun bisnis/media/komunitas (seperti keluhkesahojol, dramaojol, dll)
+      const combined = \`\${u.username || ''} \${u.full_name || ''}\`.toLowerCase();
+      const isEntity = /\b(pt\.?|cv\.?|corp|inc|ltd|co\.?|studio|agency|official|media|news|daily|info|portal|press|magazine|tv|radio|podcast|store|shop|olshop|boutique|distro|merch|coffee|kopi|cafe|resto|restaurant|kitchen|bakery|kuliner|food|community|komunitas|ojol|driver|gojek|grab|maxim|indonesia|indo|fans|fanbase|club|fc|memes?|dagelan|quotes?|artist|creator|photography|fotografi|project)\b/i.test(combined) || /(\.id|_id|\.co|\.com|\.pro|\.net|\.org|\.xyz)$/i.test(u.username || '') || /™|®|©/.test(u.full_name || '');
+      if (isEntity) {
+        u.is_official_brand = true;
+      }
+
       // Ambil angka pengikut asli dari profile endpoint
       try {
         const uRes = await fetch(\`https://www.instagram.com/api/v1/users/web_profile_info/?username=\${encodeURIComponent(u.username)}\`, { headers, credentials: 'include' });
+        if (uRes.status === 429) {
+          console.warn('[NoahIG] Instagram rate limit (429) tercapai. Melanjutkan dengan smart heuristic.');
+          break;
+        }
         if (uRes.ok) {
           const uJson = await uRes.json();
           const userObj = uJson?.data?.user;
@@ -155,7 +166,7 @@ const SATSET_SCRIPT = `
             if (userObj.full_name) u.full_name = userObj.full_name;
           }
         }
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 250));
       } catch (err) {
         // Safe continue
       }
@@ -472,7 +483,43 @@ function updateFileBadges() {
 }
 
 /**
- * Smart Account Classification Helper (v2.0)
+ * Smart Brand, Media, Community, & Business Entity Heuristics
+ * Detects accounts like keluhkesahojol.id, dramaojol.id, tradersfamily, teknologi_id, etc.
+ */
+function isLikelyOfficialOrBrand(user) {
+  if (!user) return false;
+  const uname = (user.username || '').toLowerCase();
+  const fname = (user.full_name || '').toLowerCase();
+  const combined = `${uname} ${fname}`;
+
+  // 1. Corporate / PT / CV / Agency / Studio
+  if (/\b(pt\.?|cv\.?|corp|corporation|inc|ltd|co\.?|studio|agency|firm|holding)\b/i.test(fname)) return true;
+
+  // 2. Official / Media / News / Info / Daily / Portal / TV / Radio
+  if (/\b(official|media|news|daily|info|portal|press|magazine|tv|radio|podcast|channel|berita|warta|jurnal)\b/i.test(combined)) return true;
+
+  // 3. Business / Store / Shop / Brand / Distro / Merch
+  if (/\b(store|shop|olshop|boutique|distro|merch|market|mart|brand|katalog|catalog|reseller|supplier)\b/i.test(combined)) return true;
+
+  // 4. Food & Beverage / Cafe / Coffee / Resto
+  if (/\b(coffee|kopi|cafe|cafee|resto|restaurant|kitchen|bakery|dapur|kuliner|food|bar)\b/i.test(combined)) return true;
+
+  // 5. Community / Fandom / Public accounts / Ojol / Meme
+  if (/\b(community|komunitas|ojol|driver|gojek|grab|maxim|indonesia|indo|fans|fanbase|club|fc|memes?|dagelan|quotes?|katakata|humor)\b/i.test(combined)) return true;
+
+  // 6. Professional / Creative roles / Services
+  if (/\b(artist|creator|designer|developer|photography|fotografi|videography|production|entertainment|records|consultant|service|project)\b/i.test(combined)) return true;
+
+  // 7. Domain or Brand Suffixes in username or name
+  if (/(\.id|_id|\.co|\.com|\.pro|\.net|\.org|\.xyz|\.io|\.app)$/i.test(uname)) return true;
+  if (/(\.id|\.co\.id|\.com|\.pro)$/i.test(fname)) return true;
+  if (/™|®|©/.test(user.full_name || '')) return true;
+
+  return false;
+}
+
+/**
+ * Smart Account Classification Helper (v2.1)
  */
 function getUserClassification(user) {
   if (!user) return 'friend';
@@ -493,12 +540,17 @@ function getUserClassification(user) {
     return user.follower_count >= state.officialThreshold ? 'official' : 'friend';
   }
 
-  // 4. Private accounts are virtually always personal/friend accounts
+  // 4. Smart Brand/Media/Community/Business detection (Handles unverified big accounts like keluhkesahojol.id, dramaojol.id, etc.)
+  if (isLikelyOfficialOrBrand(user)) {
+    return 'official';
+  }
+
+  // 5. Private accounts are virtually always personal/friend accounts
   if (user.is_private) {
     return 'friend';
   }
 
-  // 5. Default unverified accounts without known count are personal/friends
+  // 6. Default unverified accounts without known count are personal/friends
   return 'friend';
 }
 
@@ -790,11 +842,28 @@ function renderList() {
       ? `<span title="Official Terverifikasi (Centang Biru)" class="inline-flex text-sky-400 flex-shrink-0"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5l-4-4 1.41-1.41L11 13.67l6.59-6.59L19 8.5l-8 8z"/></svg></span>`
       : '';
 
-    const classBadgeHtml = isOfficial
-      ? `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i> Official (&gt;${formatCompactNumber(state.officialThreshold)})</span>`
-      : `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i> Teman (&lt;${formatCompactNumber(state.officialThreshold)})</span>`;
+    let classBadgeHtml = '';
+    const hasKnownCount = typeof user.follower_count === 'number' && user.follower_count > 0;
 
-    const privateBadgeHtml = user.is_private
+    if (isOfficial) {
+      if (user.is_verified) {
+        classBadgeHtml = `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i> Official (Centang Biru)</span>`;
+      } else if (hasKnownCount) {
+        classBadgeHtml = `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i> Official (&gt;${formatCompactNumber(state.officialThreshold)})</span>`;
+      } else {
+        classBadgeHtml = `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold badge-official flex items-center gap-1"><i data-lucide="sparkles" class="w-3.5 h-3.5 text-pink-400"></i> Publik / Media / Brand</span>`;
+      }
+    } else {
+      if (user.is_private) {
+        classBadgeHtml = `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="lock" class="w-3.5 h-3.5 text-sky-400"></i> Teman (Akun Gembok)</span>`;
+      } else if (hasKnownCount) {
+        classBadgeHtml = `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i> Teman (&lt;${formatCompactNumber(state.officialThreshold)})</span>`;
+      } else {
+        classBadgeHtml = `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-friend flex items-center gap-1"><i data-lucide="user" class="w-3.5 h-3.5 text-sky-400"></i> Teman (Personal)</span>`;
+      }
+    }
+
+    const privateBadgeHtml = (user.is_private && isOfficial)
       ? `<span class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold badge-private flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3 text-emerald-400"></i> Gembok</span>`
       : '';
 
